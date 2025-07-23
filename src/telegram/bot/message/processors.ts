@@ -1,5 +1,6 @@
 import TelegramBot from "node-telegram-bot-api";
 import TelegramSyncPlugin from "../../../main";
+import { OpenAIService } from "src/services/openai";
 import {
 	getChatId,
 	getChatLink,
@@ -26,6 +27,9 @@ import { defaultFileNameTemplate, defaultNoteNameTemplate } from "src/settings/m
 import { Api } from "telegram";
 import { setReaction } from "../bot";
 import { emoticonProcessed, emoticonProcessedEdited } from "src/telegram/user/config";
+
+// Cache for voice transcripts
+let _voiceTranscripts: Map<string, string> | undefined;
 
 // Delete a message or send a confirmation reply based on settings and message age
 export async function finalizeMessageProcessing(plugin: TelegramSyncPlugin, msg: TelegramBot.Message, error?: Error) {
@@ -212,7 +216,86 @@ export async function processBasicVariables(
 
 	let voiceTranscript = "";
 	if (processThis.includes("{{voiceTranscript") && plugin.bot) {
-		voiceTranscript = await Client.transcribeAudio(plugin.bot, msg, await plugin.getBotUser());
+		// Check if it's a voice/audio message and OpenAI is configured
+		const isAudioMessage = msg.voice || msg.audio || msg.video_note;
+		const openAiEnabled = plugin.settings.openAiEnabled && plugin.settings.openAiApiKey;
+		
+		if (isAudioMessage && openAiEnabled) {
+			// Try to transcribe using OpenAI Whisper
+			try {
+				const fileObject = msg.voice || msg.audio || msg.video_note;
+				if (!fileObject) {
+					// Should not happen as we checked isAudioMessage, but TypeScript needs this
+					voiceTranscript = await Client.transcribeAudio(plugin.bot, msg, await plugin.getBotUser());
+				} else {
+					const fileId = fileObject.file_id;
+					const fileSize = fileObject.file_size || 0;
+				
+				// Check file size limit (25MB for Whisper API)
+				const fileSizeInMB = fileSize / (1024 * 1024);
+				if (fileSizeInMB > plugin.settings.openAiMaxFileSize) {
+					console.log(`Audio file too large for OpenAI transcription: ${fileSizeInMB.toFixed(2)}MB`);
+					// Fall back to Telegram Premium transcription
+					voiceTranscript = await Client.transcribeAudio(plugin.bot, msg, await plugin.getBotUser());
+				} else {
+					// Download the audio file
+					const fileLink = await plugin.bot.getFileLink(fileId);
+					const fileStream = plugin.bot.getFileStream(fileId);
+					
+					if (fileStream) {
+						const fileChunks: Uint8Array[] = [];
+						for await (const chunk of fileStream) {
+							fileChunks.push(new Uint8Array(chunk));
+						}
+						
+						const fileByteArray = new Uint8Array(
+							fileChunks.reduce<number[]>((acc, val) => {
+								acc.push(...val);
+								return acc;
+							}, [])
+						);
+						
+						// Get filename for proper MIME type detection
+						const chatId = msg.chat.id < 0 ? msg.chat.id.toString().slice(4) : msg.chat.id.toString();
+						const fileName = fileLink?.split("/").pop()?.replace(/file/, `audio_${chatId}`) || `audio_${msg.message_id}.ogg`;
+						
+						// Transcribe using OpenAI
+						const result = await OpenAIService.transcribeWithNotification(
+							Buffer.from(fileByteArray),
+							fileName,
+							plugin.settings.openAiApiKey,
+							{
+								showProgress: true,
+								showCostEstimate: plugin.settings.openAiShowCostEstimate,
+							}
+						);
+						
+						if (result && result.text) {
+							voiceTranscript = result.text;
+							// Cache the transcription
+							if (!_voiceTranscripts) _voiceTranscripts = new Map();
+							_voiceTranscripts.set(`${msg.chat.id}_${msg.message_id}`, voiceTranscript);
+						} else {
+							// Fall back to Telegram Premium if OpenAI fails
+							voiceTranscript = await Client.transcribeAudio(plugin.bot, msg, await plugin.getBotUser());
+						}
+					}
+				}
+				}
+			} catch (error) {
+				console.error("OpenAI transcription failed, falling back to Telegram:", error);
+				// Fall back to Telegram Premium transcription
+				try {
+					voiceTranscript = await Client.transcribeAudio(plugin.bot, msg, await plugin.getBotUser());
+				} catch (telegramError) {
+					// If both fail, leave transcript empty
+					console.error("Both OpenAI and Telegram transcription failed:", telegramError);
+				}
+			}
+		} else {
+			// Use Telegram Premium transcription as before
+			voiceTranscript = await Client.transcribeAudio(plugin.bot, msg, await plugin.getBotUser());
+		}
 	}
 
 	const lines = processThis.split("\n");
