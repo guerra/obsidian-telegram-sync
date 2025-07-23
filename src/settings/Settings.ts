@@ -68,6 +68,13 @@ export interface TelegramSyncSettings {
 	processOldMessagesSettings: ProcessOldMessagesSettings;
 	processOtherBotsMessages: boolean;
 	retryFailedMessagesProcessing: boolean;
+	openAiApiKey: string;
+	openAiApiKeyEncrypted: boolean;
+	openAiEnabled: boolean;
+	openAiModel: string;
+	openAiMaxFileSize: number;
+	openAiTimeout: number;
+	openAiShowCostEstimate: boolean;
 	// add new settings above this line
 	topicNames: Topic[];
 }
@@ -92,6 +99,13 @@ export const DEFAULT_SETTINGS: TelegramSyncSettings = {
 	processOldMessagesSettings: getDefaultProcessOldMessagesSettings(),
 	processOtherBotsMessages: false,
 	retryFailedMessagesProcessing: false,
+	openAiApiKey: "",
+	openAiApiKeyEncrypted: false,
+	openAiEnabled: false,
+	openAiModel: "whisper-1",
+	openAiMaxFileSize: 25,
+	openAiTimeout: 60,
+	openAiShowCostEstimate: false,
 	// add new settings above this line
 	topicNames: [],
 };
