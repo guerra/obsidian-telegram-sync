@@ -15,14 +15,14 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
   - [x] 1.5 Add enable/disable toggle for Whisper transcription
   - [x] 1.6 Verify all tests pass
 
-- [ ] 2. OpenAI Service Module Implementation
-  - [ ] 2.1 Write tests for OpenAIService class methods
-  - [ ] 2.2 Create OpenAIService.ts with singleton pattern
-  - [ ] 2.3 Implement initialize() method with API client setup
-  - [ ] 2.4 Implement transcribeAudio() method with Whisper API
-  - [ ] 2.5 Add proper error handling and retry logic
-  - [ ] 2.6 Implement destroy() cleanup method
-  - [ ] 2.7 Verify all tests pass
+- [x] 2. OpenAI Service Module Implementation
+  - [x] 2.1 Write tests for OpenAIService class methods
+  - [x] 2.2 Create OpenAIService.ts with singleton pattern
+  - [x] 2.3 Implement initialize() method with API client setup
+  - [x] 2.4 Implement transcribeAudio() method with Whisper API
+  - [x] 2.5 Add proper error handling and retry logic
+  - [x] 2.6 Implement destroy() cleanup method
+  - [x] 2.7 Verify all tests pass
 
 - [ ] 3. Audio File Detection and Routing
   - [ ] 3.1 Write tests for audio file detection logic
